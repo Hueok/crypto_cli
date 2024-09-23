@@ -4,6 +4,7 @@ use std::error::Error;
 use serde::{Deserialize, Serialize};
 use chrono::{NaiveDateTime, Utc, TimeZone, FixedOffset};
 use std::collections::HashMap;
+use yansi::Paint;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DataPoint {
@@ -43,12 +44,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         */
     let current:f64 = getLivePrice().await?;
 
-    println!("test current : {}", current);
-    println!("{:?}", parsed_data[1]);
-    println!("{:?}", parsed_data[6]);
-    println!("{:?}", parsed_data[16]);
-    println!("{:?}", parsed_data[31]);
-    println!("{:?}", parsed_data[61]);
+    // Test
+    // println!("test current : {}", current);
+    // println!("{:?}", parsed_data[1]);
+    // println!("{:?}", parsed_data[6]);
+    // println!("{:?}", parsed_data[16]);
+    // println!("{:?}", parsed_data[31]);
+    // println!("{:?}", parsed_data[61]);
 
     let test: &str = getChangeInfo(&parsed_data, current);
 
@@ -70,7 +72,7 @@ async fn fetch_data() -> Result<Vec<DataPoint>, Box<dyn std::error::Error>> {
     let body = response.text().await?;
 
     // Parse JSON
-    let parsed_data: Vec<DataPoint> = serde_json::from_str(&body).expect("Failed to parse JSON");
+    let parsed_data: Vec<DataPoint> = serde_json::from_str(&body).expect("Failed to parse JSON in CANDLES");
 
     Ok(parsed_data)
 }
@@ -89,7 +91,7 @@ async fn getLivePrice() -> Result<f64, Box<dyn std::error::Error>> {
     let body = response.text().await?;
 
     // Parse JSON
-    let parsed_data: Ticker = serde_json::from_str(&body).expect("Failed to parse JSON");
+    let parsed_data: Ticker = serde_json::from_str(&body).expect("Failed to parse JSON in TICKER");
     let price = parsed_data.price.parse::<f64>().unwrap();
 
     Ok(price)
@@ -99,7 +101,7 @@ async fn getLivePrice() -> Result<f64, Box<dyn std::error::Error>> {
 fn getChangeInfo(data: &Vec<DataPoint>, current: f64) -> &str {
 
     let now: &DataPoint = &data[0];
-    let mut element: Vec<f64> = Vec::new();
+    let mut element: Vec<String> = Vec::new();
 
     //set gradualarity: test with 5m
     let granularity = "1m";
@@ -114,10 +116,10 @@ fn getChangeInfo(data: &Vec<DataPoint>, current: f64) -> &str {
     granularity_map.insert("1d", vec![(1, " 1d"), (2, " 2d"), (7, " 1w"), (14, " 2w"), (28, " 1m")]);
 
     // Example usage
-    for (key, value) in &granularity_map {
-        println!("{}: {:?}", key, value);
-    }
-    
+    // for (key, value) in &granularity_map {
+    //     println!("{}: {:?}", key, value);
+    // }
+
     for i in 0..=4{
         let idx = granularity_map.get(granularity).unwrap()[i].0;
         let last_price = data[idx].close;
@@ -125,14 +127,23 @@ fn getChangeInfo(data: &Vec<DataPoint>, current: f64) -> &str {
         element.push(change);
     }
 
+    print!("BTC-USD | ${}\t", current);
     for i in 0..=4{
-        println!("{}: {}", granularity_map.get(granularity).unwrap()[i].1, element[i]);
+        print!("{}: {}\t", granularity_map.get(granularity).unwrap()[i].1, element[i]);
     }
+    println!();
 
     "test"
 }
 
-fn getChange(before: f64, after: f64) -> f64 {
+fn getChange(before: f64, after: f64) -> String {
     let change = (after - before) / before * 100.0;
-    (change* 100.0).round() / 100.0
+    let rounded_change = (change* 100.0).round() / 100.0;
+    if rounded_change > 0.0 {
+        Paint::green(format!("+{:.2}%", rounded_change)).to_string()
+    } else if rounded_change < 0.0 {
+        Paint::red(format!("{:.2}%", rounded_change)).to_string()
+    } else {
+        Paint::white(format!("{:.2}%", rounded_change)).to_string()
+    }
 }
